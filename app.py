@@ -17,6 +17,7 @@ from neo4j_service import (
     delete_place,
     delete_user,
     get_dashboard_metrics,
+    get_friends,
     get_profile,
     get_users,
     graph_neighborhood,
@@ -26,6 +27,7 @@ from neo4j_service import (
     reset_data,
     search_places,
     seed_demo_data,
+    set_friends,
     update_place,
     update_user,
     validate_place,
@@ -322,7 +324,7 @@ elif page == "Manage Places":
 
 elif page == "Manage Users":
     st.subheader("👥 เพิ่ม / แก้ไข / ลบผู้ใช้")
-    t1, t2, t3, t4 = st.tabs(["📋 รายชื่อ", "➕ เพิ่ม", "✏️ แก้ไข", "🗑️ ลบ"])
+    t1, t2, t3, tf, t4 = st.tabs(["📋 รายชื่อ", "➕ เพิ่ม", "✏️ แก้ไข", "🤝 เพื่อน", "🗑️ ลบ"])
     users = get_users()
     cats = list_categories() or CATEGORIES
     with t1:
@@ -362,6 +364,20 @@ elif page == "Manage Users":
                 else:
                     update_user(uid, name, av, bio, interests)
                     flash(f"แก้ไขผู้ใช้ '{name.strip()}' แล้ว")
+    with tf:
+        if users:
+            labels = {f"{u['user_id']} — {u['name']}": u["user_id"] for u in users}
+            fuid = labels[st.selectbox("เลือกผู้ใช้", list(labels), key="friend_user_sel")]
+            name_of = {u["user_id"]: u["name"] for u in users if u["user_id"] != fuid}
+            current = [f["user_id"] for f in get_friends(fuid) if f["user_id"] in name_of]
+            st.caption("เลือกเพื่อนได้หลายคน กดบันทึกแล้วรายชื่อเพื่อนของผู้ใช้คนนี้จะถูกแทนที่ด้วยรายการที่เลือก")
+            with st.form(f"friends_{fuid}"):
+                chosen = st.multiselect("เพื่อนของผู้ใช้คนนี้", list(name_of), default=current,
+                                        format_func=lambda i: f"{i} — {name_of[i]}")
+                ok = st.form_submit_button("💾 บันทึกเพื่อน")
+            if ok:
+                set_friends(fuid, chosen)
+                flash(f"บันทึกเพื่อนแล้ว ({len(chosen)} คน)")
     with t4:
         if users:
             labels = {f"{u['user_id']} — {u['name']}": u for u in users}
