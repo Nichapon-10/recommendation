@@ -517,6 +517,33 @@ def delete_user(user_id: str, delete_places: bool) -> None:
     query("MATCH (u:User {user_id:$uid}) DETACH DELETE u", {"uid": user_id}, write=True)
 
 
+def get_friends(user_id: str) -> list[dict[str, Any]]:
+    """Friends of a user (FRIEND_OF is treated as symmetric, so direction is ignored)."""
+    return query(
+        """
+        MATCH (:User {user_id:$uid})-[:FRIEND_OF]-(f:User)
+        RETURN DISTINCT f.user_id AS user_id, f.name AS name
+        ORDER BY f.user_id
+        """,
+        {"uid": user_id},
+    )
+
+
+def set_friends(user_id: str, friend_ids: list[str]) -> None:
+    """Replace the user's friend list with friend_ids (removes old FRIEND_OF, creates new ones)."""
+    query("MATCH (:User {user_id:$uid})-[r:FRIEND_OF]-(:User) DELETE r", {"uid": user_id}, write=True)
+    if friend_ids:
+        query(
+            """
+            MATCH (u:User {user_id:$uid})
+            UNWIND $fids AS fid
+            MATCH (f:User {user_id:fid}) WHERE f <> u
+            MERGE (u)-[:FRIEND_OF]->(f)
+            """,
+            {"uid": user_id, "fids": friend_ids}, write=True,
+        )
+
+
 def get_dashboard_metrics() -> dict[str, Any]:
     rows = query(
         """
